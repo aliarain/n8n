@@ -1,0 +1,113 @@
+{
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "customer-service-call",
+          "options": {}
+        },
+        "name": "Webhook Trigger",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [250, 300]
+      },
+      {
+        "parameters": {
+          "operation": "chat",
+          "model": "gpt-4o",
+          "prompt": "You are a customer service agent for a retail business. Respond politely and helpfully to this inquiry: '{{$node['Webhook Trigger'].json['body']['inquiry']}}'. Keep the response concise, max 100 words, and suitable for text-to-speech."
+        },
+        "name": "Custom GPT Response",
+        "type": "n8n-nodes-base.openAi",
+        "typeVersion": 1,
+        "position": [450, 300],
+        "credentials": {
+          "openAiApi": {
+            "id": "YOUR_OPENAI_CREDENTIALS_ID",
+            "name": "OpenAI API"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "textToSpeech",
+          "voiceId": "YOUR_ELEVENLABS_VOICE_ID",
+          "text": "={{$node['Custom GPT Response'].json['response']}}"
+        },
+        "name": "ElevenLabs TTS",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 1,
+        "position": [650, 300],
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "YOUR_ELEVENLABS_CREDENTIALS_ID",
+            "name": "ElevenLabs API",
+            "headers": {
+              "xi-api-key": "YOUR_ELEVENLABS_API_KEY"
+            }
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "append",
+          "spreadsheetId": "YOUR_GOOGLE_SHEET_ID",
+          "range": "Sheet1!A:C",
+          "values": {
+            "data": [
+              [
+                "={{new Date().toISOString()}}",
+                "={{$node['Webhook Trigger'].json['body']['inquiry']}}",
+                "={{$node['Custom GPT Response'].json['response']}}"
+              ]
+            ]
+          }
+        },
+        "name": "Log to Google Sheets",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 1,
+        "position": [850, 300],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "YOUR_GOOGLE_SHEETS_CREDENTIALS_ID",
+            "name": "Google Sheets"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook Trigger": {
+        "main": [
+          [
+            {
+              "node": "Custom GPT Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Custom GPT Response": {
+        "main": [
+          [
+            {
+              "node": "ElevenLabs TTS",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "ElevenLabs TTS": {
+        "main": [
+          [
+            {
+              "node": "Log to Google Sheets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
