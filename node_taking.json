@@ -1,0 +1,175 @@
+{
+    "nodes": [
+      {
+        "parameters": {
+          "authentication": "telegramBotApi",
+          "chatId": "",
+          "text": "={{$json['message']['text']}}",
+          "operation": "message"
+        },
+        "name": "Telegram Trigger",
+        "type": "n8n-nodes-base.telegramTrigger",
+        "typeVersion": 1,
+        "position": [250, 300],
+        "credentials": {
+          "telegramBotApi": {
+            "id": "YOUR_TELEGRAM_BOT_CREDENTIALS_ID",
+            "name": "Telegram Bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "chat",
+          "model": "gpt-4o",
+          "prompt": "Extract the following from this note: '{{$node['Telegram Trigger'].json['message']['text']}}'\n1. Date and time (standardize to YYYY-MM-DD HH:MM)\n2. Subject (short summary, max 50 chars)\n3. Organized note (cleaned-up text, max 200 chars)\n4. Action items (list, if any)\n5. Due date (YYYY-MM-DD, if mentioned, else null)\nReturn as JSON:\n{\n  \"dateTime\": \"\",\n  \"subject\": \"\",\n  \"note\": \"\",\n  \"actionItems\": [],\n  \"dueDate\": null\n}"
+        },
+        "name": "OpenAI Process Note",
+        "type": "n8n-nodes-base.openAi",
+        "typeVersion": 1,
+        "position": [450, 300],
+        "credentials": {
+          "openAiApi": {
+            "id": "YOUR_OPENAI_CREDENTIALS_ID",
+            "name": "OpenAI API"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "getAll",
+          "spreadsheetId": "YOUR_GOOGLE_SHEET_ID",
+          "range": "Sheet1!A:E",
+          "options": {}
+        },
+        "name": "Check Google Sheets",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 1,
+        "position": [650, 300],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "YOUR_GOOGLE_SHEETS_CREDENTIALS_ID",
+            "name": "Google Sheets"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "string": [
+              {
+                "value1": "={{$node['Check Google Sheets'].json.map(item => item.Subject + item.DateTime).includes($node['OpenAI Process Note'].json.subject + $node['OpenAI Process Note'].json.dateTime)}}",
+                "operation": "equal",
+                "value2": "false"
+              }
+            ]
+          }
+        },
+        "name": "Deduplication Check",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [850, 300]
+      },
+      {
+        "parameters": {
+          "operation": "append",
+          "spreadsheetId": "YOUR_GOOGLE_SHEET_ID",
+          "range": "Sheet1!A:E",
+          "values": {
+            "data": [
+              [
+                "={{$node['OpenAI Process Note'].json.dateTime}}",
+                "={{$node['OpenAI Process Note'].json.subject}}",
+                "={{$node['OpenAI Process Note'].json.note}}",
+                "={{$node['OpenAI Process Note'].json.actionItems.join(', ')}}",
+                "={{$node['OpenAI Process Note'].json.dueDate}}"
+              ]
+            ]
+          }
+        },
+        "name": "Append to Google Sheets",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 1,
+        "position": [1050, 200],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "YOUR_GOOGLE_SHEETS_CREDENTIALS_ID",
+            "name": "Google Sheets"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "chatId": "={{$node['Telegram Trigger'].json['message']['chat']['id']}}",
+          "text": "Note processed and saved to Google Sheets!"
+        },
+        "name": "Telegram Confirmation",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1,
+        "position": [1250, 200],
+        "credentials": {
+          "telegramBotApi": {
+            "id": "YOUR_TELEGRAM_BOT_CREDENTIALS_ID",
+            "name": "Telegram Bot"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Telegram Trigger": {
+        "main": [
+          [
+            {
+              "node": "OpenAI Process Note",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "OpenAI Process Note": {
+        "main": [
+          [
+            {
+              "node": "Check Google Sheets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check Google Sheets": {
+        "main": [
+          [
+            {
+              "node": "Deduplication Check",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Deduplication Check": {
+        "main": [
+          [
+            {
+              "node": "Append to Google Sheets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Append to Google Sheets": {
+        "main": [
+          [
+            {
+              "node": "Telegram Confirmation",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
