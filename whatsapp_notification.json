@@ -1,0 +1,145 @@
+{
+    "nodes": [
+      {
+        "parameters": {
+          "triggerOn": "fileCreated",
+          "folderId": "YOUR_GOOGLE_DRIVE_FOLDER_ID",
+          "fileTypes": "image/png,image/jpeg"
+        },
+        "name": "Google Drive Trigger",
+        "type": "n8n-nodes-base.googleDriveTrigger",
+        "typeVersion": 1,
+        "position": [250, 300],
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "YOUR_GOOGLE_DRIVE_CREDENTIALS_ID",
+            "name": "Google Drive"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "download",
+          "fileId": "={{$node['Google Drive Trigger'].json['id']}}"
+        },
+        "name": "Download Photo",
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 1,
+        "position": [450, 300],
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "YOUR_GOOGLE_DRIVE_CREDENTIALS_ID",
+            "name": "Google Drive"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "ocr",
+          "file": "={{$node['Download Photo'].binary['data']}}",
+          "options": {
+            "language": "eng",
+            "isTable": false
+          }
+        },
+        "name": "OCR with OCRSpace",
+        "type": "n8n-nodes-base.ocrSpace",
+        "typeVersion": 1,
+        "position": [650, 300],
+        "credentials": {
+          "ocrSpaceApi": {
+            "id": "YOUR_OCRPACE_CREDENTIALS_ID",
+            "name": "OCRSpace API"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "append",
+          "spreadsheetId": "YOUR_GOOGLE_SHEET_ID",
+          "range": "Sheet1!A:C",
+          "values": {
+            "data": [
+              [
+                "={{new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi' })}}",
+                "={{$node['Google Drive Trigger'].json['name']}}",
+                "={{$node['OCR with OCRSpace'].json['ParsedResults'][0]['ParsedText']}}"
+              ]
+            ]
+          }
+        },
+        "name": "Log to Google Sheets",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 1,
+        "position": [850, 300],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "YOUR_GOOGLE_SHEETS_CREDENTIALS_ID",
+            "name": "Google Sheets"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "chatId": "YOUR_TELEGRAM_CHAT_ID",
+          "text": "OCR processed for {{$node['Google Drive Trigger'].json['name']}} at {{new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi' })}}. Check Google Sheets!"
+        },
+        "name": "Telegram Notification",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1,
+        "position": [1050, 300],
+        "credentials": {
+          "telegramBotApi": {
+            "id": "YOUR_TELEGRAM_BOT_CREDENTIALS_ID",
+            "name": "Telegram Bot"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Google Drive Trigger": {
+        "main": [
+          [
+            {
+              "node": "Download Photo",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Download Photo": {
+        "main": [
+          [
+            {
+              "node": "OCR with OCRSpace",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "OCR with OCRSpace": {
+        "main": [
+          [
+            {
+              "node": "Log to Google Sheets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Log to Google Sheets": {
+        "main": [
+          [
+            {
+              "node": "Telegram Notification",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
