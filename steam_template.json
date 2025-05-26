@@ -1,0 +1,106 @@
+{
+    "nodes": [
+      {
+        "parameters": {
+          "cronExpression": "0 19 * * *"
+        },
+        "name": "Daily Schedule",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1,
+        "position": [250, 300]
+      },
+      {
+        "parameters": {
+          "url": "https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/",
+          "options": {
+            "queryParameters": {
+              "appid": "YOUR_STEAM_APP_ID",
+              "count": 10,
+              "maxlength": 300
+            }
+          }
+        },
+        "name": "Check Steam Updates",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 1,
+        "position": [450, 300],
+        "credentials": {
+          "httpBasicAuth": {
+            "id": "YOUR_STEAM_API_CREDENTIALS_ID",
+            "name": "Steam API"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "append",
+          "spreadsheetId": "YOUR_GOOGLE_SHEET_ID",
+          "range": "Sheet1!A:C",
+          "values": {
+            "data": "= {{$node['Check Steam Updates'].json['appnews']['newsitems'].map(item => [item.title, item.url, new Date().toISOString().split('T')[0]] )}}"
+          }
+        },
+        "name": "Log to Google Sheets",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 1,
+        "position": [650, 300],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "YOUR_GOOGLE_SHEETS_CREDENTIALS_ID",
+            "name": "Google Sheets"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "chatId": "YOUR_TELEGRAM_CHAT_ID",
+          "text": "= {{$node['Check Steam Updates'].json['appnews']['newsitems'].length > 0 ? 'New game updates available: ' + $node['Check Steam Updates'].json['appnews']['newsitems'].map(item => item.title).join(', ') : 'No new updates today.'}}"
+        },
+        "name": "Telegram Notification",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1,
+        "position": [850, 300],
+        "credentials": {
+          "telegramBotApi": {
+            "id": "YOUR_TELEGRAM_BOT_CREDENTIALS_ID",
+            "name": "Telegram Bot"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Daily Schedule": {
+        "main": [
+          [
+            {
+              "node": "Check Steam Updates",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check Steam Updates": {
+        "main": [
+          [
+            {
+              "node": "Log to Google Sheets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Log to Google Sheets": {
+        "main": [
+          [
+            {
+              "node": "Telegram Notification",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
